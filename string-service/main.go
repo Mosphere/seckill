@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,6 +13,8 @@ import (
 	"seckill/string-service/service"
 	"seckill/string-service/transport"
 	"syscall"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 func main() {
@@ -22,8 +23,8 @@ func main() {
 	var (
 		servicePort = flag.String("service.port", "10085", "service port")
 		serviceHost = flag.String("service.host", "127.0.0.1", "service host")
-		consulPort = flag.String("consul.port", "8500", "consul port")
-		consulHost = flag.String("consul.host", "127.0.0.1", "consul host")
+		consulPort  = flag.String("consul.port", "8500", "consul port")
+		consulHost  = flag.String("consul.host", "127.0.0.1", "consul host")
 		serviceName = flag.String("service.name", "string", "service name")
 	)
 
@@ -31,16 +32,14 @@ func main() {
 
 	ctx := context.Background()
 	errChan := make(chan error)
-	var discoveryClient *discover.DiscoveryClient
-	discoveryClient = discover.New(*consulHost, *consulPort)
+	var discoveryClient = discover.New(*consulHost, *consulPort)
 
 	/*if err != nil{
 		config.Logger.Println("Get Consul Client failed")
 		os.Exit(-1)
 
 	}*/
-	var svc service.Service
-	svc = service.StringService{}
+	var svc = service.StringService{}
 	stringEndpoint := endpoint.MakeStringEndpoint(svc)
 
 	//创建健康检查的Endpoint
@@ -54,7 +53,7 @@ func main() {
 
 	//创建http.Handler
 	r := transport.MakeHttpHandler(ctx, endpts, config.KitLogger)
-	UUID, _ := uuid.NewV4()
+	UUID := uuid.NewV4()
 	instanceId := *serviceName + "-" + UUID.String()
 
 	//http server
@@ -62,13 +61,13 @@ func main() {
 
 		config.Logger.Println("Http Server start at port:" + *servicePort)
 		//启动前执行注册
-		if !discoveryClient.Register(instanceId, *serviceHost,"/health",*servicePort, *serviceName,3,nil,nil, config.Logger){
-			config.Logger.Printf("string-service for service %s failed.", serviceName)
+		if !discoveryClient.Register(instanceId, *serviceHost, "/health", *servicePort, *serviceName, 3, nil, nil, config.Logger) {
+			config.Logger.Printf("string-service for service %s failed.", *serviceName)
 			// 注册失败，服务启动失败
 			os.Exit(-1)
 		}
 		handler := r
-		errChan<- http.ListenAndServe(":"  + *servicePort, handler)
+		errChan <- http.ListenAndServe(":"+*servicePort, handler)
 	}()
 
 	go func() {

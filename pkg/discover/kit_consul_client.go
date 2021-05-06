@@ -1,70 +1,69 @@
 package discover
 
 import (
-	"github.com/go-kit/kit/sd/consul"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/api/watch"
-
 	"log"
 	"seckill/pkg/common"
 	"strconv"
+
+	"github.com/go-kit/kit/sd/consul"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/api/watch"
 )
 
 /**
 注册服务
- */
-func (consulClt *DiscoveryClient)Register(instanceId, svcHost,svcPort, healthCheckUrl, svcName string, weight int, meta map[string]string, tags []string, logger *log.Logger) bool{
+*/
+func (consulClt *DiscoveryClient) Register(instanceId, svcHost, svcPort, healthCheckUrl, svcName string, weight int, meta map[string]string, tags []string, logger *log.Logger) bool {
 	port, _ := strconv.Atoi(svcPort)
 	serviceRegistration := &api.AgentServiceRegistration{
-		ID: instanceId,
-		Name: svcName,
-		Tags: tags,
+		ID:      instanceId,
+		Name:    svcName,
+		Tags:    tags,
 		Address: svcHost,
-		Port: port,
-		Meta: meta,
+		Port:    port,
+		Meta:    meta,
 		Weights: &api.AgentWeights{
 			Passing: weight,
 		},
 		Check: &api.AgentServiceCheck{
 			DeregisterCriticalServiceAfter: "30s",
-			HTTP: "http://" + svcHost + ":" + strconv.Itoa(port) + healthCheckUrl,
-			Interval: "15s",
-
+			HTTP:                           "http://" + svcHost + ":" + svcPort + healthCheckUrl,
+			Interval:                       "15s",
 		},
 	}
 
 	err := consulClt.client.Register(serviceRegistration)
-	if err != nil{
-		if logger != nil{
+	if err != nil {
+		if logger != nil {
 			logger.Println("Register Service Error!")
 		}
 		return false
 	}
 	//构建服务实例
-	if logger != nil{
+	if logger != nil {
 		logger.Println("Register Service Success!")
 	}
 	return true
 }
 
-func New(consulHost , consulPort string) *DiscoveryClient{
+func New(consulHost, consulPort string) *DiscoveryClient {
 	port, _ := strconv.Atoi(consulPort)
 	apiConfig := api.DefaultConfig()
 	apiConfig.Address = consulHost + ":" + strconv.Itoa(port)
 	apiClient, err := api.NewClient(apiConfig)
-	if err != nil{
+	if err != nil {
 		return nil
 	}
 	consulClt := consul.NewClient(apiClient)
 	return &DiscoveryClient{
-		Host: consulHost,
-		Port: port,
+		Host:   consulHost,
+		Port:   port,
 		client: consulClt,
 		config: apiConfig,
 	}
 }
 
-func (consulClt *DiscoveryClient)DeRegister(instanceId string, logger *log.Logger) bool{
+func (consulClt *DiscoveryClient) DeRegister(instanceId string, logger *log.Logger) bool {
 	serviceRegistration := &api.AgentServiceRegistration{
 		ID: instanceId,
 	}
@@ -80,10 +79,11 @@ func (consulClt *DiscoveryClient)DeRegister(instanceId string, logger *log.Logge
 	}
 	return true
 }
+
 /*
 发现服务
- */
-func (consulClt *DiscoveryClient)DiscoveryServices(svcName string, logger *log.Logger) []*common.ServiceInstance{
+*/
+func (consulClt *DiscoveryClient) DiscoveryServices(svcName string, logger *log.Logger) []*common.ServiceInstance {
 
 	//该服务已监控并缓存
 	instanceList, ok := consulClt.instancesMap.Load(svcName)
@@ -98,7 +98,7 @@ func (consulClt *DiscoveryClient)DiscoveryServices(svcName string, logger *log.L
 	instanceList, ok = consulClt.instancesMap.Load(svcName)
 	if ok {
 		return instanceList.([]*common.ServiceInstance)
-	}else{
+	} else {
 		//注册监控
 		go func() {
 			params := make(map[string]interface{})
@@ -106,7 +106,7 @@ func (consulClt *DiscoveryClient)DiscoveryServices(svcName string, logger *log.L
 			params["service"] = svcName
 			plan, _ := watch.Parse(params)
 			plan.Handler = func(u uint64, i interface{}) {
-				if i == nil{
+				if i == nil {
 					return
 				}
 
@@ -115,7 +115,7 @@ func (consulClt *DiscoveryClient)DiscoveryServices(svcName string, logger *log.L
 					return //数据异常，忽略
 				}
 
-				if len(v) == 0{
+				if len(v) == 0 {
 					consulClt.instancesMap.Store(svcName, []*common.ServiceInstance{})
 				}
 
@@ -132,37 +132,36 @@ func (consulClt *DiscoveryClient)DiscoveryServices(svcName string, logger *log.L
 		}()
 	}
 
-
 	// 根据服务名请求服务实例列表
 	entries, _, err := consulClt.client.Service(svcName, "", false, nil)
-	if err != nil{
+	if err != nil {
 		consulClt.instancesMap.Store(svcName, []*common.ServiceInstance{})
-		if logger != nil{
+		if logger != nil {
 			logger.Println("Discover Service Error!")
 		}
 		return nil
 	}
 
 	instances := make([]*common.ServiceInstance, len(entries))
-	for i := 0; i< len(instances); i++{
+	for i := 0; i < len(instances); i++ {
 		instances[i] = newServiceInstance(entries[i].Service)
 	}
 	consulClt.instancesMap.Store(svcName, instances)
 	return instances
 }
 
-func newServiceInstance(service *api.AgentService) *common.ServiceInstance{
+func newServiceInstance(service *api.AgentService) *common.ServiceInstance {
 	rpcPort := service.Port - 1
-	if service.Meta != nil{
-		if rpcPortStr, ok := service.Meta["rpcPort"]; ok{
+	if service.Meta != nil {
+		if rpcPortStr, ok := service.Meta["rpcPort"]; ok {
 			rpcPort, _ = strconv.Atoi(rpcPortStr)
 		}
 	}
 
 	return &common.ServiceInstance{
-		Host: service.Address,
-		Port: service.Port,
+		Host:     service.Address,
+		Port:     service.Port,
 		GrpcPort: rpcPort,
-		Weight: service.Weights.Passing,
+		Weight:   service.Weights.Passing,
 	}
 }
