@@ -28,7 +28,7 @@ type Service interface {
 }
 
 type UseStringService struct {
-	client      discover.DiscoveryClient
+	client      *discover.DiscoveryClient
 	loadBalance loadbalance.LoadBalance
 }
 
@@ -38,7 +38,7 @@ type StringResponse struct {
 	Error  error  `json:"error"`
 }
 
-func NewService(client discover.DiscoveryClient, lb loadbalance.LoadBalance) *UseStringService {
+func NewService(client *discover.DiscoveryClient, lb loadbalance.LoadBalance) *UseStringService {
 	// 设置触发最低请求阀值为 5，方便我们观察结果
 	hystrix.ConfigureCommand(StringSvcCmdName, hystrix.CommandConfig{
 		RequestVolumeThreshold: 5,
