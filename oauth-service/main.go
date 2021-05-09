@@ -72,9 +72,10 @@ func main() {
 		TokenEndpoint:      endpoints.MakeTokenEndpoint(tokenGranter),
 		CheckTokenEndpoint: endpoints.MakeCheckTokenEndpoint(tokenSvc),
 		HealthEndpoint:     endpoints.MakeHealthEndpoint(svc),
+		SimpleEndpoint:     endpoints.MakeSimpleEndpoint(svc),
 	}
 	//创建httpHandler
-	r := transport.MakeHttpHandler(ctx, endpts, clientDetailSvc, config.KitLogger)
+	r := transport.MakeHttpHandler(ctx, endpts, tokenSvc, clientDetailSvc, config.KitLogger)
 	instanceId := *serviceName + "-" + uuid.NewV4().String()
 	logs.Info("instanceId: ", instanceId)
 	errC := make(chan error)

@@ -10,5 +10,6 @@ require (
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/consul/api v1.8.1
 	github.com/jinzhu/gorm v1.9.16
+	github.com/longjoy/micro-go-book v0.0.0-20210220030758-712f09c3f9db
 	github.com/satori/go.uuid v1.2.0
 )
